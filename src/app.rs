@@ -1,89 +1,78 @@
-use egui::{Align, Widget};
+use eframe::egui;
+use egui::Align;
 use egui_file_dialog::FileDialog;
 use gdal::Dataset;
 use std::path::PathBuf;
 
 #[derive(Default)]
-pub struct ViewerPage(String);
+pub struct ViewerPage {
+    text: String,
+    is_open: bool,
+}
 
 impl ViewerPage {
     fn new(s: String) -> Self {
-        Self(s)
+        Self {
+            text: s,
+            is_open: true,
+        }
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
     }
 
-    fn show(&mut self, ctx: &egui::Context) {
-        egui::CentralPanel::default().show(ctx, |ui| {
-            // HomePage is a simple page with centered text and file loader.
-            ui.centered_and_justified(|inner| {
-                inner.heading("Hey you did it!");
-            })
-        });
+    pub fn show(&mut self, ctx: &egui::Context, open: &bool) {
+        let viewport_id: egui::ViewportId = egui::ViewportId::from_hash_of(format!("edit test"));
+        let viewport_builder = egui::ViewportBuilder::default()
+            .with_title(&self.text)
+            .with_close_button(true);
+        let viewport_cb = |ctx: &egui::Context, _| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                ui.label("Name:");
+                ui.label("Body:");
+            });
+        };
+        ctx.show_viewport_immediate(viewport_id, viewport_builder, viewport_cb);
     }
 }
 pub struct HomePage {
-    file_dialog: FileDialog,
+    picked_path: Option<String>,
+    show_window: bool,
 }
 
 impl HomePage {
     fn new() -> Self {
         Self {
-            file_dialog: FileDialog::new(),
+            picked_path: None,
+            show_window: true,
         }
     }
 
-    fn show(&mut self, ctx: &egui::Context) -> Option<String> {
+    fn show(&mut self, ctx: &egui::Context, open: &mut bool) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.with_layout(egui::Layout::top_down_justified(Align::Center), |inner| {
-                inner.heading("Select a source Dataset");
-                if inner.button("Select file").clicked() {
-                    self.file_dialog.select_file();
+            ui.label("Drag-and-drop files onto the window!");
+            if ui.button("Open file…").clicked() {
+                if let Some(path) = rfd::FileDialog::new().pick_file() {
+                    self.picked_path = Some(path.display().to_string());
                 }
-                // Update the dialog and check if the user selected a file
-                if let Some(path) = self.file_dialog.update(ctx).selected() {
-                    inner.label(format!("Selected file: {:?}", path));
-                    Some(String::from("Hey wassup"))
-                } else {
-                    None
-                }
-            })
+            }
         });
-        None
     }
 }
 
 impl Default for HomePage {
     fn default() -> Self {
         HomePage {
-            file_dialog: FileDialog::new(),
+            picked_path: None,
+            show_window: true,
         }
     }
 }
-
-/* impl eframe::App for HomePage {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {
-            // HomePage is a simple page with centered text and file loader.
-            ui.with_layout(egui::Layout::top_down_justified(Align::Center), |inner| {
-                inner.heading("Select a source Dataset");
-                if inner.button("Select file").clicked() {
-                    self.0.select_file();
-                }
-                // Update the dialog and check if the user selected a file
-                if let Some(path) = self.0.update(ctx).selected() {
-                    inner.label(format!("Selected file: {:?}", path));
-                    ViewerPage::new(ctx);
-                }
-            })
-        });
-    }
-} */
 
 #[derive(Default)]
 pub struct ViewerApp {
     homepage: HomePage,
     viewer: ViewerPage,
+    datasets: Vec<Dataset>,
 }
 
 impl ViewerApp {
@@ -93,47 +82,29 @@ impl ViewerApp {
 }
 
 impl eframe::App for ViewerApp {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
-        if self.viewer.0.len() > 0 {
-            self.viewer.show(ctx)
-        } else {
-            match self.homepage.show(ctx) {
-                Some(s) => {
-                    self.viewer = ViewerPage::new(s);
-                    self.viewer.show(ctx)
-                }
-                None => {
-                    self.homepage.show(ctx);
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.label("Drag-and-drop files onto the window!");
+            if ui.button("Open file…").clicked() {
+                if let Some(path) = rfd::FileDialog::new().pick_file() {
+                    self.viewer = ViewerPage::new("text".into());
                 }
             }
-        }
-
-        /*
-        ui.separator();
-
-        ui.add(egui::github_link_file!(
-            "https://github.com/emilk/eframe_template/blob/main/",
-            "Source code."
-        ));
-
-        ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-            powered_by_egui_and_eframe(ui);
-            egui::warn_if_debug_build(ui);
+            self.viewer.show(ctx, &self.viewer.is_open);
         });
-        */
+
+        /* if let Some(picked_path) = &self.picked_path {
+            ui.horizontal(|ui| {
+                ui.label("Picked file:");
+                ui.monospace(picked_path);
+                Window::new()
+            });
+        } */
     }
 }
 
-fn powered_by_egui_and_eframe(ui: &mut egui::Ui) {
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 0.0;
-        ui.label("Powered by ");
-        ui.hyperlink_to("egui", "https://github.com/emilk/egui");
-        ui.label(" and ");
-        ui.hyperlink_to(
-            "eframe",
-            "https://github.com/emilk/egui/tree/master/crates/eframe",
-        );
-        ui.label(".");
-    });
-}
+/* fn open_viewer(ctx: &egui::Context) {
+    use egui::*;
+
+    if ctx.input(|i| i.)
+} */
