@@ -1,4 +1,5 @@
 use eframe::egui;
+use rand::prelude::*;
 use std::path::PathBuf;
 
 pub struct ViewerPage {
@@ -31,7 +32,7 @@ impl ViewerPage {
     fn new(s: String) -> Self {
         Self {
             text: s,
-            is_open: true,
+            is_open: false,
         }
     }
 
@@ -42,6 +43,8 @@ impl ViewerPage {
             egui::CentralPanel::default().show(ctx, |ui| {
                 ui.label("Name:");
                 ui.label("Body:");
+                ui.label(self.is_open.to_string());
+                ui.label(rand::random::<u32>().to_string());
             });
         };
         ctx.show_viewport_immediate(viewport_id, viewport_builder, viewport_cb);
@@ -54,7 +57,7 @@ impl ViewerPage {
 
 #[derive(Default)]
 pub struct ViewerApp {
-    viewer: Vec<ViewerPage>,
+    viewer: ViewerPage,
 }
 
 impl ViewerApp {
@@ -68,9 +71,12 @@ impl eframe::App for ViewerApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.label("Drag-and-drop files onto the window!");
             if ui.button("Open file…").clicked() {
-                if let Some(path) = rfd::FileDialog::new().pick_files() {
-                    self.viewer = path.iter().map(ViewerPage::from).collect();
+                if let Some(path) = rfd::FileDialog::new().pick_file() {
+                    self.viewer = ViewerPage::from(&path);
                 }
+            }
+            if self.viewer.is_open {
+                self.viewer.show(ctx);
             }
         });
         /* if let Some(picked_path) = &self.picked_path {
