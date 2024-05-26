@@ -1,50 +1,75 @@
+use crate::data::dataset;
 use eframe::egui;
-use rand::prelude::*;
+use gdal::{
+    vector::{Layer, LayerAccess},
+    Dataset,
+};
 use std::path::PathBuf;
 
-pub struct ViewerPage {
-    text: String,
+pub struct Metadata {
+    layer_name: String,
     is_open: bool,
 }
 
-impl Default for ViewerPage {
+#[derive(Default)]
+pub struct ViewerPage {
+    data: Option<Dataset>,
+    metadata: Option<Metadata>,
+    is_open: bool,
+}
+
+/* impl Default for ViewerPage {
     fn default() -> Self {
         Self {
-            text: String::from("viewer"),
+            data: None,
             is_open: false,
         }
     }
-}
+} */
 
 impl From<&PathBuf> for ViewerPage {
     fn from(value: &PathBuf) -> Self {
-        match value.to_str() {
-            Some(s) => Self {
-                text: String::from(s),
+        match dataset(PathBuf::from(value)) {
+            Ok(d) => Self {
+                metadata: Some(Metadata {
+                    layer_name: d.layer(0).unwrap().name(),
+                    is_open: true,
+                }),
+                data: Some(d),
                 is_open: true,
             },
-            None => Default::default(),
+            Err(_) => ViewerPage::default(),
         }
     }
 }
 
 impl ViewerPage {
-    fn new(s: String) -> Self {
-        Self {
-            text: s,
-            is_open: false,
-        }
-    }
-
     pub fn show(&mut self, ctx: &egui::Context) {
         let viewport_id: egui::ViewportId = egui::ViewportId::from_hash_of("edit test");
-        let viewport_builder = egui::ViewportBuilder::default().with_title(&self.text);
+        let viewport_builder = egui::ViewportBuilder::default().with_title("test");
+        //let layer_names: Vec<String> = d.layers().map(|layer| layer.name()).collect();
         let viewport_cb = |ctx: &egui::Context, _| {
-            egui::CentralPanel::default().show(ctx, |ui| {
-                ui.label("Name:");
-                ui.label("Body:");
-                ui.label(self.is_open.to_string());
-                ui.label(rand::random::<u32>().to_string());
+            egui::SidePanel::left("layers").show(ctx, |ui| {
+                ui.label("Layers:");
+                for l in self.data.as_ref().unwrap().layers() {
+                    if ui.button(l.name()).clicked() {
+                        self.metadata = Some(Metadata {
+                            layer_name: l.name(),
+                            is_open: true,
+                        })
+                    }
+                }
+            });
+            egui::SidePanel::left("metadata").show(ctx, |ui| {
+                ui.label(
+                    self.data
+                        .as_ref()
+                        .unwrap()
+                        .layer_by_name(&self.metadata.as_ref().unwrap().layer_name)
+                        .unwrap()
+                        .feature_count()
+                        .to_string(),
+                )
             });
         };
         ctx.show_viewport_immediate(viewport_id, viewport_builder, viewport_cb);
@@ -72,7 +97,7 @@ impl eframe::App for ViewerApp {
             ui.label("Drag-and-drop files onto the window!");
             if ui.button("Open file…").clicked() {
                 if let Some(path) = rfd::FileDialog::new().pick_file() {
-                    self.viewer = ViewerPage::from(&path);
+                    self.viewer = ViewerPage::try_from(&path).unwrap();
                 }
             }
             if self.viewer.is_open {
