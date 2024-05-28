@@ -1,26 +1,24 @@
 use crate::data::dataset;
 use eframe::egui;
-use gdal::{
-    vector::{Layer, LayerAccess},
-    Dataset,
-};
+use gdal::{vector::LayerAccess, Dataset};
 use std::path::PathBuf;
 
-pub struct Metadata {
+/* pub struct Metadata {
     layer_name: String,
     is_open: bool,
-}
+} */
 
 #[derive(Default)]
 pub struct ViewerPage {
+    active_layer: isize,
     data: Option<Dataset>,
-    metadata: Option<Metadata>,
     is_open: bool,
 }
 
 /* impl Default for ViewerPage {
     fn default() -> Self {
         Self {
+            active_layer: 0,
             data: None,
             is_open: false,
         }
@@ -31,10 +29,7 @@ impl From<&PathBuf> for ViewerPage {
     fn from(value: &PathBuf) -> Self {
         match dataset(PathBuf::from(value)) {
             Ok(d) => Self {
-                metadata: Some(Metadata {
-                    layer_name: d.layer(0).unwrap().name(),
-                    is_open: true,
-                }),
+                active_layer: 0,
                 data: Some(d),
                 is_open: true,
             },
@@ -45,38 +40,99 @@ impl From<&PathBuf> for ViewerPage {
 
 impl ViewerPage {
     pub fn show(&mut self, ctx: &egui::Context) {
-        let viewport_id: egui::ViewportId = egui::ViewportId::from_hash_of("edit test");
-        let viewport_builder = egui::ViewportBuilder::default().with_title("test");
-        //let layer_names: Vec<String> = d.layers().map(|layer| layer.name()).collect();
-        let viewport_cb = |ctx: &egui::Context, _| {
-            egui::SidePanel::left("layers").show(ctx, |ui| {
-                ui.label("Layers:");
-                for l in self.data.as_ref().unwrap().layers() {
+        //egui::Window::new("Viewer").title_bar(false).show(ctx, |_| {
+        egui::SidePanel::left("layers").show(ctx, |ui| {
+            ui.label("Layers:");
+            ui.add_space(5.0);
+            self.data
+                .as_ref()
+                .unwrap()
+                .layers()
+                .enumerate()
+                .for_each(|(i, l)| {
                     if ui.button(l.name()).clicked() {
-                        self.metadata = Some(Metadata {
-                            layer_name: l.name(),
-                            is_open: true,
-                        })
+                        self.active_layer = i as isize;
                     }
-                }
-            });
-            egui::SidePanel::left("metadata").show(ctx, |ui| {
-                ui.label(
-                    self.data
-                        .as_ref()
-                        .unwrap()
-                        .layer_by_name(&self.metadata.as_ref().unwrap().layer_name)
-                        .unwrap()
-                        .feature_count()
-                        .to_string(),
-                )
-            });
-        };
-        ctx.show_viewport_immediate(viewport_id, viewport_builder, viewport_cb);
-        if ctx.input(|i| i.viewport().close_requested()) {
-            // Tell parent viewport that we should not show next frame:
-            self.is_open = false;
-        }
+                });
+        });
+        egui::SidePanel::left("metadata").show(ctx, |ui| {
+            ui.label("Feature count:");
+            ui.label(
+                self.data
+                    .as_ref()
+                    .unwrap()
+                    .layer(self.active_layer)
+                    .unwrap()
+                    .feature_count()
+                    .to_string(),
+            );
+            ui.label("X max:");
+            ui.label(
+                self.data
+                    .as_ref()
+                    .unwrap()
+                    .layer(self.active_layer)
+                    .unwrap()
+                    .get_extent()
+                    .unwrap()
+                    .MaxX
+                    .to_string(),
+            );
+            ui.label("X min:");
+            ui.label(
+                self.data
+                    .as_ref()
+                    .unwrap()
+                    .layer(self.active_layer)
+                    .unwrap()
+                    .get_extent()
+                    .unwrap()
+                    .MinX
+                    .to_string(),
+            );
+            ui.label("Y max:");
+            ui.label(
+                self.data
+                    .as_ref()
+                    .unwrap()
+                    .layer(self.active_layer)
+                    .unwrap()
+                    .get_extent()
+                    .unwrap()
+                    .MaxY
+                    .to_string(),
+            );
+            ui.label("Y min:");
+            ui.label(
+                self.data
+                    .as_ref()
+                    .unwrap()
+                    .layer(self.active_layer)
+                    .unwrap()
+                    .get_extent()
+                    .unwrap()
+                    .MinY
+                    .to_string(),
+            );
+            ui.label("Spatial reference:");
+            ui.label(
+                self.data
+                    .as_ref()
+                    .unwrap()
+                    .layer(self.active_layer)
+                    .unwrap()
+                    .spatial_ref()
+                    .unwrap()
+                    .to_pretty_wkt()
+                    .unwrap(),
+            );
+        });
+        egui::SidePanel::right("closing").show(ctx, |ui| {
+            if ui.button("x").clicked() {
+                self.is_open = false;
+            }
+        });
+        //});
     }
 }
 
@@ -86,7 +142,7 @@ pub struct ViewerApp {
 }
 
 impl ViewerApp {
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         Default::default()
     }
 }
@@ -97,20 +153,14 @@ impl eframe::App for ViewerApp {
             ui.label("Drag-and-drop files onto the window!");
             if ui.button("Open file…").clicked() {
                 if let Some(path) = rfd::FileDialog::new().pick_file() {
-                    self.viewer = ViewerPage::try_from(&path).unwrap();
+                    self.viewer = ViewerPage::from(&path);
                 }
             }
+
             if self.viewer.is_open {
                 self.viewer.show(ctx);
             }
         });
-        /* if let Some(picked_path) = &self.picked_path {
-            ui.horizontal(|ui| {
-                ui.label("Picked file:");
-                ui.monospace(picked_path);
-                Window::new()
-            });
-        } */
     }
 }
 

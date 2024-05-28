@@ -32,8 +32,5 @@ fn get_dataset_options() -> DatasetOptions<'static> {
 }
 
 pub fn dataset(p: PathBuf) -> Result<Dataset, GdalError> {
-    match Dataset::open_ex(&p, get_dataset_options()) {
-        Ok(d) => Ok(d),
-        Err(e) => Err(e),
-    }
+    Dataset::open_ex(p, get_dataset_options())
 }
