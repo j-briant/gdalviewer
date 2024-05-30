@@ -15,7 +15,6 @@ impl<'a> Widget for FeatureWidget<'a> {
                 self.paint_background(painter, rect);
                 self.paint_geometry(painter, rect);
             }
-            response
         })
         .response
     }
@@ -61,22 +60,22 @@ impl<'a> FeatureWidget<'a> {
             (x_transformed, y_transformed)
         };
 
-        let points: Vec<(f64, f64, f64)> = self.geometry.get_point_vec();
-        println!("{:?}", points);
-        let coord: Vec<Pos2> = points
-            .iter()
-            .map(|&(x, y, _)| {
-                let (x, y) = transform(x, y);
-                Pos2::new(x as f32, y as f32)
-            })
-            .collect();
-        println!("{:?}", coord);
-        for p in coord {
-            painter.add(Shape::circle_stroke(
-                p,
-                10.0,
-                egui::Stroke::new(2.0, Color32::WHITE),
-            ));
+        for idx in 0..=self.geometry.geometry_count() {
+            let points: Vec<(f64, f64, f64)> = self.geometry.get_geometry(idx).get_point_vec();
+            let coord: Vec<Pos2> = points
+                .iter()
+                .map(|&(x, y, _)| {
+                    let (x, y) = transform(x, y);
+                    Pos2::new(x as f32, y as f32)
+                })
+                .collect();
+            for p in coord {
+                painter.add(Shape::circle_stroke(
+                    p,
+                    10.0,
+                    egui::Stroke::new(2.0, Color32::WHITE),
+                ));
+            }
         }
     }
 }

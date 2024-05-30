@@ -7,8 +7,8 @@ pub struct Srs {
 }
 
 impl From<&Layer<'_>> for Srs {
-    fn from(srs: &Layer<'_>) -> Self {
-        if let Some(sr) = srs.spatial_ref() {
+    fn from(layer: &Layer<'_>) -> Self {
+        if let Some(sr) = layer.spatial_ref() {
             Self {
                 wkt: sr.to_pretty_wkt().unwrap_or(String::from("")),
             }
@@ -24,6 +24,7 @@ impl Widget for Srs {
             ui.collapsing(RichText::new("SRS:").strong(), |ext| {
                 ext.monospace(RichText::new("WKT: "));
                 ext.label(self.wkt);
+                ext.add_space(10.0);
             });
         })
         .response

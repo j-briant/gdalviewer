@@ -1,5 +1,6 @@
 use crate::{
-    data::dataset, extent_panel::Extent, features::FeatureWidget, layer_panel::LayerList, srs::Srs,
+    data::dataset, extent_panel::Extent, features::FeatureWidget, fields::Fields,
+    layer_panel::LayerList, srs::Srs,
 };
 use eframe::egui;
 use egui::{Id, LayerId, Order, Painter};
@@ -54,8 +55,9 @@ impl ViewerPage {
                     .show(ctx, |ui| ui.add(LayerList::new(d, &mut self.active_layer)));
 
                 egui::SidePanel::left("metadata").show(ctx, |ui| {
+                    ui.add(Srs::new(layer));
                     ui.add(Extent::new(layer));
-                    ui.add(Srs::new(layer))
+                    ui.add(Fields::new(layer));
                 });
 
                 egui::CentralPanel::default().show(ctx, |ui| {
