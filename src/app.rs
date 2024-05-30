@@ -1,5 +1,8 @@
-use crate::data::dataset;
+use crate::{
+    data::dataset, extent_panel::Extent, features::FeatureWidget, layer_panel::LayerList, srs::Srs,
+};
 use eframe::egui;
+use egui::{Id, LayerId, Order, Painter};
 use gdal::{vector::LayerAccess, Dataset};
 use std::path::PathBuf;
 
@@ -40,98 +43,39 @@ impl From<&PathBuf> for ViewerPage {
 
 impl ViewerPage {
     pub fn show(&mut self, ctx: &egui::Context) {
-        //egui::Window::new("Viewer").title_bar(false).show(ctx, |_| {
-        egui::SidePanel::left("layers").show(ctx, |ui| {
-            ui.label("Layers:");
-            ui.add_space(5.0);
-            self.data
-                .as_ref()
-                .unwrap()
-                .layers()
-                .enumerate()
-                .for_each(|(i, l)| {
-                    if ui.button(l.name()).clicked() {
-                        self.active_layer = i as isize;
-                    }
+        match &self.data {
+            Some(d) => {
+                let layer = &d.layer(self.active_layer).unwrap();
+                let mut layer2 = d.layer(self.active_layer).unwrap();
+                let feature = layer2.features().next().unwrap();
+
+                egui::SidePanel::left("layer_list")
+                    .show_separator_line(false)
+                    .show(ctx, |ui| ui.add(LayerList::new(d, &mut self.active_layer)));
+
+                egui::SidePanel::left("metadata").show(ctx, |ui| {
+                    ui.add(Extent::new(layer));
+                    ui.add(Srs::new(layer))
                 });
-        });
-        egui::SidePanel::left("metadata").show(ctx, |ui| {
-            ui.label("Feature count:");
-            ui.label(
-                self.data
-                    .as_ref()
-                    .unwrap()
-                    .layer(self.active_layer)
-                    .unwrap()
-                    .feature_count()
-                    .to_string(),
-            );
-            ui.label("X max:");
-            ui.label(
-                self.data
-                    .as_ref()
-                    .unwrap()
-                    .layer(self.active_layer)
-                    .unwrap()
-                    .get_extent()
-                    .unwrap()
-                    .MaxX
-                    .to_string(),
-            );
-            ui.label("X min:");
-            ui.label(
-                self.data
-                    .as_ref()
-                    .unwrap()
-                    .layer(self.active_layer)
-                    .unwrap()
-                    .get_extent()
-                    .unwrap()
-                    .MinX
-                    .to_string(),
-            );
-            ui.label("Y max:");
-            ui.label(
-                self.data
-                    .as_ref()
-                    .unwrap()
-                    .layer(self.active_layer)
-                    .unwrap()
-                    .get_extent()
-                    .unwrap()
-                    .MaxY
-                    .to_string(),
-            );
-            ui.label("Y min:");
-            ui.label(
-                self.data
-                    .as_ref()
-                    .unwrap()
-                    .layer(self.active_layer)
-                    .unwrap()
-                    .get_extent()
-                    .unwrap()
-                    .MinY
-                    .to_string(),
-            );
-            ui.label("Spatial reference:");
-            ui.label(
-                self.data
-                    .as_ref()
-                    .unwrap()
-                    .layer(self.active_layer)
-                    .unwrap()
-                    .spatial_ref()
-                    .unwrap()
-                    .to_pretty_wkt()
-                    .unwrap(),
-            );
-        });
-        egui::SidePanel::right("closing").show(ctx, |ui| {
-            if ui.button("x").clicked() {
-                self.is_open = false;
+
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    //ui.add(GeometryPainter::new(&layer.feature(0).unwrap()));
+                    ui.push_id("id_source", |ui| ui.add(FeatureWidget::new(&feature)));
+                    //ui.label(feature.geometry().unwrap().wkt().unwrap())
+                    //ui.add(GeometryPainter::new(&feature));
+                });
             }
-        });
+            None => {}
+        }
+
+        // Top-right corner closing button
+        egui::Area::new(egui::Id::new("close_button_area"))
+            .anchor(egui::Align2::RIGHT_TOP, egui::Vec2::new(-10.0, 10.0))
+            .show(ctx, |ui| {
+                if ui.button("X").clicked() {
+                    self.is_open = false;
+                }
+            });
         //});
     }
 }
@@ -149,6 +93,7 @@ impl ViewerApp {
 
 impl eframe::App for ViewerApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        ctx.set_pixels_per_point(1.2);
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.label("Drag-and-drop files onto the window!");
             if ui.button("Open file…").clicked() {
