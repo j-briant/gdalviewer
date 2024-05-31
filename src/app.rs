@@ -1,38 +1,24 @@
 use crate::{
-    data::dataset, extent_panel::Extent, features::FeatureWidget, fields::Fields,
+    data::dataset, extent::Extent, features::FeatureWidget, fields::Fields, geometry::GeometryInfo,
     layer_panel::LayerList, srs::Srs,
 };
 use eframe::egui;
-use egui::{Id, LayerId, Order, Painter};
 use gdal::{vector::LayerAccess, Dataset};
 use std::path::PathBuf;
 
-/* pub struct Metadata {
-    layer_name: String,
-    is_open: bool,
-} */
-
 #[derive(Default)]
 pub struct ViewerPage {
+    driver: String,
     active_layer: isize,
     data: Option<Dataset>,
     is_open: bool,
 }
 
-/* impl Default for ViewerPage {
-    fn default() -> Self {
-        Self {
-            active_layer: 0,
-            data: None,
-            is_open: false,
-        }
-    }
-} */
-
 impl From<&PathBuf> for ViewerPage {
     fn from(value: &PathBuf) -> Self {
         match dataset(PathBuf::from(value)) {
             Ok(d) => Self {
+                driver: d.driver().long_name(),
                 active_layer: 0,
                 data: Some(d),
                 is_open: true,
@@ -48,23 +34,34 @@ impl ViewerPage {
             Some(d) => {
                 let layer = &d.layer(self.active_layer).unwrap();
                 let mut layer2 = d.layer(self.active_layer).unwrap();
-                let feature = layer2.features().next().unwrap();
+                let feature = layer2.features().last().unwrap();
 
-                egui::SidePanel::left("layer_list")
-                    .show_separator_line(false)
-                    .show(ctx, |ui| ui.add(LayerList::new(d, &mut self.active_layer)));
+                egui::SidePanel::left("dataset_info")
+                    .show_separator_line(true)
+                    .show(ctx, |ui| {
+                        ui.heading("Dataset information");
+                        ui.add_space(10.0);
+                        ui.monospace(egui::RichText::new("Driver:").strong());
+                        ui.label(&self.driver);
+                        ui.add_space(10.0);
+                        ui.add(LayerList::new(d, &mut self.active_layer));
+                    });
 
-                egui::SidePanel::left("metadata").show(ctx, |ui| {
-                    ui.add(Srs::new(layer));
-                    ui.add(Extent::new(layer));
-                    ui.add(Fields::new(layer));
+                egui::SidePanel::left("layer_info").show(ctx, |ui| {
+                    ui.heading("Layer information");
+                    ui.add_space(10.0);
+                    egui::ScrollArea::vertical().show(ui, |ui| {
+                        ui.with_layout(egui::Layout::top_down(egui::Align::Max), |ui| {
+                            ui.add(Srs::new(layer));
+                            ui.add(Extent::new(layer));
+                            ui.add(Fields::new(layer));
+                            ui.add(GeometryInfo::new(layer));
+                        })
+                    });
                 });
 
                 egui::CentralPanel::default().show(ctx, |ui| {
-                    //ui.add(GeometryPainter::new(&layer.feature(0).unwrap()));
                     ui.push_id("id_source", |ui| ui.add(FeatureWidget::new(&feature)));
-                    //ui.label(feature.geometry().unwrap().wkt().unwrap())
-                    //ui.add(GeometryPainter::new(&feature));
                 });
             }
             None => {}

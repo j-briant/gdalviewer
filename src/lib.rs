@@ -2,9 +2,10 @@
 
 mod app;
 pub mod data;
-mod extent_panel;
+mod extent;
 mod features;
 mod fields;
+mod geometry;
 mod layer_panel;
 mod srs;
 pub use app::ViewerApp;

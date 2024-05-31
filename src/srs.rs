@@ -26,6 +26,7 @@ impl Widget for Srs {
                 ext.label(self.wkt);
                 ext.add_space(10.0);
             });
+            ui.add_space(10.0);
         })
         .response
     }

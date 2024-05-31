@@ -1,24 +1,11 @@
 use egui::{RichText, Widget};
 use egui_extras::{Column, TableBuilder};
 use gdal::vector::{Layer, LayerAccess};
-use std::collections::HashMap;
 
 #[derive(Default)]
 pub struct Fields {
     geom_field: Vec<String>,
     fields: Vec<(String, u32)>,
-}
-
-impl From<&Layer<'_>> for Fields {
-    fn from(layer: &Layer<'_>) -> Self {
-        let fields: Vec<(String, u32)> = layer
-            .defn()
-            .fields()
-            .map(|f| (f.name(), f.field_type()))
-            .collect();
-        let geom_field: Vec<String> = layer.defn().geom_fields().map(|g| g.name()).collect();
-        Self { geom_field, fields }
-    }
 }
 
 impl Widget for Fields {
@@ -56,6 +43,12 @@ impl Widget for Fields {
 
 impl Fields {
     pub fn new(layer: &Layer<'_>) -> Self {
-        Self::from(layer)
+        let fields: Vec<(String, u32)> = layer
+            .defn()
+            .fields()
+            .map(|f| (f.name(), f.field_type()))
+            .collect();
+        let geom_field: Vec<String> = layer.defn().geom_fields().map(|g| g.name()).collect();
+        Self { geom_field, fields }
     }
 }
