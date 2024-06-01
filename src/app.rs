@@ -1,6 +1,12 @@
 use crate::{
-    data::dataset, extent::Extent, features::FeatureWidget, fields::Fields, geometry::GeometryInfo,
-    layer_panel::LayerList, srs::Srs,
+    data::dataset,
+    extent::Extent,
+    features::FeatureWidget,
+    fields::Fields,
+    geometry::GeometryInfo,
+    layer_panel::LayerList,
+    map::{Map, MapState},
+    srs::Srs,
 };
 use eframe::egui;
 use gdal::{vector::LayerAccess, Dataset};
@@ -8,6 +14,7 @@ use std::path::PathBuf;
 
 #[derive(Default)]
 pub struct ViewerPage {
+    map_state: MapState,
     driver: String,
     active_layer: isize,
     data: Option<Dataset>,
@@ -18,6 +25,7 @@ impl From<&PathBuf> for ViewerPage {
     fn from(value: &PathBuf) -> Self {
         match dataset(PathBuf::from(value)) {
             Ok(d) => Self {
+                map_state: MapState::new(),
                 driver: d.driver().long_name(),
                 active_layer: 0,
                 data: Some(d),
@@ -34,7 +42,7 @@ impl ViewerPage {
             Some(d) => {
                 let layer = &d.layer(self.active_layer).unwrap();
                 let mut layer2 = d.layer(self.active_layer).unwrap();
-                let feature = layer2.features().last().unwrap();
+                //let feature = layer2.features().last().unwrap();
 
                 egui::SidePanel::left("dataset_info")
                     .show_separator_line(true)
@@ -61,7 +69,9 @@ impl ViewerPage {
                 });
 
                 egui::CentralPanel::default().show(ctx, |ui| {
-                    ui.push_id("id_source", |ui| ui.add(FeatureWidget::new(&feature)));
+                    //ui.push_id("id_source", |ui| ui.add(FeatureWidget::new(&feature)));
+                    let mut map = Map::new(&mut self.map_state, &mut layer2);
+                    map.update(ui, ctx);
                 });
             }
             None => {}
