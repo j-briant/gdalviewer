@@ -16,22 +16,15 @@ impl MapState {
             zoom: 1.0,
         }
     }
+
     pub fn handle_input(&mut self, ctx: &Context) {
-        if ctx.input(|i| i.pointer.primary_clicked()) {
-            self.last_mouse_pos = ctx.input(|i| i.pointer.interact_pos());
-        }
-        if let Some(last_mouse_pos) = self.last_mouse_pos {
-            if ctx.input(|i| i.pointer.primary_down()) {
-                let new_mouse_pos = ctx.input(|i| i.pointer.latest_pos().unwrap());
-                let delta = new_mouse_pos - last_mouse_pos;
-                self.offset += delta;
-                self.last_mouse_pos = Some(new_mouse_pos);
-            }
+        if ctx.input(|i| i.pointer.primary_down()) {
+            self.offset += ctx.input(|i| i.pointer.delta());
         }
     }
 
     pub fn handle_zoom(&mut self, ctx: &Context) {
-        let zoom_delta = ctx.input(|i| (i.raw_scroll_delta.y / 50.0)).round();
+        let zoom_delta = ctx.input(|i| i.smooth_scroll_delta.y / (100.0));
         self.zoom += zoom_delta;
     }
 }
@@ -49,6 +42,7 @@ impl<'a> Map<'a> {
     pub fn update(&mut self, ui: &mut Ui, ctx: &Context) {
         self.map_state.handle_input(ctx);
         self.map_state.handle_zoom(ctx);
+        println!("{}", self.map_state.zoom);
         self.render_map(ui);
     }
 
@@ -82,14 +76,23 @@ impl<'a> Map<'a> {
                 }
 
                 for point in points {
-                    let x = (point.0 as f32 + 10.0 - point.0 as f32)
-                        + self.map_state.zoom
-                        + self.map_state.offset.x
-                        + available_size.x / 2.0;
-                    let y = (point.1 as f32 + 10.0 - point.1 as f32)
-                        + self.map_state.zoom
-                        + self.map_state.offset.y
-                        + available_size.y / 2.0;
+                    /* let x = (point.0 as f32 + 10.0 - point.0 as f32)
+                    + self.map_state.zoom
+                    + self.map_state.offset.x
+                    + available_size.x / 2.0; */
+                    /* let y = (point.1 as f32 + 10.0 - point.1 as f32)
+                    + self.map_state.zoom
+                    + self.map_state.offset.y
+                    + available_size.y / 2.0; */
+
+                    let x = point.0 as f32 * available_size.x * self.map_state.zoom
+                        / (geometry.envelope().MaxX) as f32
+                        + self.map_state.offset.x;
+
+                    let y = -(point.1 as f32 * available_size.y * self.map_state.zoom)
+                        / (geometry.envelope().MaxY) as f32
+                        + available_size.y
+                        + self.map_state.offset.y;
 
                     println!("x: {}\ny: {}", x, y);
                     println!("zoom: {}", self.map_state.zoom);
