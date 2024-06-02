@@ -1,10 +1,9 @@
-use egui::{debug_text::print, Context, Painter, Pos2, Ui, Vec2};
+use egui::{Context, Painter, Pos2, Ui, Vec2};
 use gdal::vector::{Layer, LayerAccess};
 
 #[derive(Default)]
 pub struct MapState {
     offset: Vec2,
-    last_mouse_pos: Option<Pos2>,
     zoom: f32,
 }
 
@@ -12,19 +11,18 @@ impl MapState {
     pub fn new() -> Self {
         Self {
             offset: Vec2::new(0.0, 0.0),
-            last_mouse_pos: Some(Pos2::new(0.0, 0.0)),
             zoom: 1.0,
         }
     }
 
-    pub fn handle_input(&mut self, ctx: &Context) {
+    pub fn handle_drag(&mut self, ctx: &Context) {
         if ctx.input(|i| i.pointer.primary_down()) {
             self.offset += ctx.input(|i| i.pointer.delta());
         }
     }
 
     pub fn handle_zoom(&mut self, ctx: &Context) {
-        let zoom_delta = ctx.input(|i| i.smooth_scroll_delta.y / (100.0));
+        let zoom_delta = ctx.input(|i| i.smooth_scroll_delta.y / (1000.0));
         self.zoom += zoom_delta;
     }
 }
@@ -40,9 +38,8 @@ impl<'a> Map<'a> {
     }
 
     pub fn update(&mut self, ui: &mut Ui, ctx: &Context) {
-        self.map_state.handle_input(ctx);
+        self.map_state.handle_drag(ctx);
         self.map_state.handle_zoom(ctx);
-        println!("{}", self.map_state.zoom);
         self.render_map(ui);
     }
 
@@ -54,6 +51,7 @@ impl<'a> Map<'a> {
                 let available_size = inner.available_size();
                 let (_, painter) =
                     inner.allocate_painter(inner.available_size(), egui::Sense::hover());
+
                 let rect = painter.clip_rect();
                 painter.rect_stroke(rect, 0.0, egui::Stroke::new(2.0, egui::Color32::RED));
 
@@ -64,6 +62,8 @@ impl<'a> Map<'a> {
     }
 
     fn render_layer(&mut self, painter: &Painter, available_size: Vec2) {
+        let rect = painter.clip_rect();
+        let bbox = self.layer.get_extent().unwrap();
         for feature in self.layer.features() {
             if let Some(geometry) = feature.geometry() {
                 let mut points: Vec<(f64, f64, f64)> = vec![];
@@ -75,32 +75,51 @@ impl<'a> Map<'a> {
                     }
                 }
 
-                for point in points {
-                    /* let x = (point.0 as f32 + 10.0 - point.0 as f32)
-                    + self.map_state.zoom
-                    + self.map_state.offset.x
-                    + available_size.x / 2.0; */
-                    /* let y = (point.1 as f32 + 10.0 - point.1 as f32)
-                    + self.map_state.zoom
-                    + self.map_state.offset.y
-                    + available_size.y / 2.0; */
+                // Transform geo referenced coordinates into screen coordinates
+                let transform = |x: f64, y: f64| {
+                    let mut ratio_x = 0.0;
+                    let mut ratio_y = 0.0;
+                    if bbox.MaxX != bbox.MinX && bbox.MaxY != bbox.MinY {
+                        ratio_x += bbox.MaxX - bbox.MinX;
+                        ratio_y += bbox.MaxY - bbox.MinY;
+                    } else {
+                        ratio_x += bbox.MaxX;
+                        ratio_y += bbox.MaxY;
+                    }
 
-                    let x = point.0 as f32 * available_size.x * self.map_state.zoom
-                        / (geometry.envelope().MaxX) as f32
-                        + self.map_state.offset.x;
+                    let x_transformed = rect.min.x as f64
+                        + self.map_state.zoom as f64
+                            * available_size.x as f64
+                            * (x / ratio_x - (bbox.MaxX + bbox.MinX) / (2.0 * ratio_x) + 0.5)
+                        + self.map_state.offset.x as f64;
 
-                    let y = -(point.1 as f32 * available_size.y * self.map_state.zoom)
-                        / (geometry.envelope().MaxY) as f32
-                        + available_size.y
-                        + self.map_state.offset.y;
+                    let y_transformed = rect.min.y as f64
+                        + self.map_state.zoom as f64
+                            * available_size.y as f64
+                            * (-y / ratio_y + (bbox.MaxY + bbox.MinY) / (2.0 * ratio_y) + 0.5)
+                        + self.map_state.offset.y as f64;
+                    (x_transformed, y_transformed)
+                };
 
-                    println!("x: {}\ny: {}", x, y);
-                    println!("zoom: {}", self.map_state.zoom);
-                    println!("mouse pos: {:?}", self.map_state.last_mouse_pos);
-                    println!("offset: {:?}", self.map_state.offset);
+                let coord: Vec<Pos2> = points
+                    .iter()
+                    .map(|(x, y, _)| {
+                        let (x, y) = transform(*x, *y);
+                        Pos2::new(x as f32, y as f32)
+                    })
+                    .collect();
 
-                    painter.circle_filled(Pos2::new(x, y), 5.0, egui::Color32::WHITE);
-                }
+                coord.iter().for_each(|c| {
+                    painter.add(egui::Shape::circle_stroke(
+                        *c,
+                        5.0,
+                        egui::Stroke::new(2.0, egui::Color32::WHITE),
+                    ));
+                });
+                painter.add(egui::Shape::line(
+                    coord,
+                    egui::Stroke::new(1.0, egui::Color32::RED),
+                ));
             }
         }
     }
