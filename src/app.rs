@@ -1,15 +1,14 @@
 use crate::{
     data::dataset,
     extent::Extent,
-    features::FeatureWidget,
     fields::Fields,
     geometry::GeometryInfo,
     layer_panel::LayerList,
     map::{Map, MapState},
     srs::Srs,
 };
-use eframe::egui;
-use gdal::{vector::LayerAccess, Dataset};
+use eframe::{egui, Frame};
+use gdal::Dataset;
 use std::path::PathBuf;
 
 #[derive(Default)]

@@ -44,27 +44,15 @@ impl<'a> Map<'a> {
     }
 
     pub fn render_map(&mut self, ui: &mut Ui) -> egui::Response {
-        ui.allocate_ui_with_layout(
-            ui.available_size(),
-            egui::Layout::top_down(egui::Align::Min),
-            |inner| {
-                let available_size = inner.available_size();
-                let (_, painter) =
-                    inner.allocate_painter(inner.available_size(), egui::Sense::hover());
+        let available_size = ui.available_size();
+        let (response, painter) = ui.allocate_painter(available_size, egui::Sense::hover());
 
-                let rect = painter.clip_rect();
-                painter.rect_stroke(rect, 0.0, egui::Stroke::new(2.0, egui::Color32::RED));
-
-                self.render_layer(&painter, available_size);
-            },
-        )
-        .response
-    }
-
-    fn render_layer(&mut self, painter: &Painter, available_size: Vec2) {
         let rect = painter.clip_rect();
+        painter.rect_stroke(rect, 0.0, egui::Stroke::new(2.0, egui::Color32::RED));
+
+        //self.render_layer(&painter, available_size);
         let bbox = self.layer.get_extent().unwrap();
-        for feature in self.layer.features() {
+        for (u, feature) in self.layer.features().enumerate() {
             if let Some(geometry) = feature.geometry() {
                 let mut points: Vec<(f64, f64, f64)> = vec![];
                 if !geometry.geometry_name().contains("POLYGON") {
@@ -101,26 +89,56 @@ impl<'a> Map<'a> {
                     (x_transformed, y_transformed)
                 };
 
-                let coord: Vec<Pos2> = points
+                let coord: Vec<Coordinates> = points
                     .iter()
                     .map(|(x, y, _)| {
-                        let (x, y) = transform(*x, *y);
-                        Pos2::new(x as f32, y as f32)
+                        let (xs, ys) = transform(*x, *y);
+                        Coordinates::new((*x, *y), Pos2::new(xs as f32, ys as f32))
+                        //Pos2::new(x as f32, y as f32)
                     })
                     .collect();
 
-                coord.iter().for_each(|c| {
-                    painter.add(egui::Shape::circle_stroke(
-                        *c,
-                        5.0,
-                        egui::Stroke::new(2.0, egui::Color32::WHITE),
-                    ));
-                });
+                let vertex: Vec<egui::Shape> = coord
+                    .iter()
+                    .enumerate()
+                    .map(|(i, c)| {
+                        let index = format!("{}{}", u, i).parse::<u32>().unwrap();
+                        let point_rect =
+                            egui::Rect::from_center_size(c.screen_coordinates, Vec2::splat(10.0));
+                        let point_id = response.id.with(index);
+                        let point_response =
+                            ui.interact(point_rect, point_id, egui::Sense::click());
+                        point_response.clone().on_hover_ui(|popup| {
+                            popup.label(format!(
+                                "x: {}, y: {}",
+                                c.geo_coordinates.0, c.geo_coordinates.1
+                            ));
+                        });
+                        let stroke = ui.style().interact(&point_response).fg_stroke;
+                        egui::Shape::circle_stroke(c.screen_coordinates, 5.0, stroke)
+                    })
+                    .collect();
                 painter.add(egui::Shape::line(
-                    coord,
+                    coord.iter().map(|c| c.screen_coordinates).collect(),
                     egui::Stroke::new(1.0, egui::Color32::RED),
                 ));
+                painter.extend(vertex);
             }
+        }
+        response
+    }
+}
+
+struct Coordinates {
+    geo_coordinates: (f64, f64),
+    screen_coordinates: Pos2,
+}
+
+impl Coordinates {
+    fn new(geo_coordinates: (f64, f64), screen_coordinates: Pos2) -> Self {
+        Self {
+            geo_coordinates,
+            screen_coordinates,
         }
     }
 }
